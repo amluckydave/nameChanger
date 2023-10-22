@@ -1,7 +1,7 @@
 /build
 /dist
-./nameChanger
-./vnev_new
+/nameChanger
+/vnev_new
 13.txt
 chen.py
 check.py
