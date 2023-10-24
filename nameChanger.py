@@ -3,7 +3,7 @@ import sys
 import time
 import regex as re
 import configparser
-import images_rc
+import images_rc  # QPixmap
 
 if hasattr(sys, 'frozen'):
     os.environ['PATH'] = sys._MEIPASS + ";" + os.environ['PATH']
@@ -13,8 +13,8 @@ from nameChangerPath import nameChangerPathDef
 
 from invoice_changer import Ui_MainWindow
 from aboutme import Ui_about
-from PyQt5.QtWidgets import QMainWindow, QApplication, QFileDialog, QMessageBox, QDialog, QAction
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtWidgets import QMainWindow, QApplication, QFileDialog, QMessageBox, QDialog
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QObject
 from PyQt5.QtGui import QIcon, QCursor, QPixmap
 
 # 创建一个新的ConfigParser对象
@@ -23,6 +23,12 @@ addrNameChanger = nameChangerPathDef()
 
 dirName = r'C:\Users'
 
+class SharedParams(QObject):
+    def __init__(self):
+        super(SharedParams, self).__init__()
+        self.pattern = ""
+shared_params = SharedParams()
+
 
 class TaskThread(QThread):  # change to new names thread
     task_completed = pyqtSignal()
@@ -30,14 +36,20 @@ class TaskThread(QThread):  # change to new names thread
     task_error = pyqtSignal(str)
     task_hash = pyqtSignal(dict)
 
+    def __init__(self, ):
+        super(TaskThread, self).__init__()
+
     def run(self):
         try:
+            pattern = shared_params.pattern
             # 创建一个空的哈希表
             correspondence = {}
 
             fileNameList = os.listdir(dirName)
             total = len(fileNameList)
-            rules = re.compile(r'(?<=\+\D*)\d+', re.S)
+            if pattern == "":
+                self.task_error.emit(str('Please choose the separator.'))
+            rules = re.compile(pattern, re.S)
 
             # 开始数组循环更改文件名
             for index, filename in enumerate(fileNameList):
@@ -165,6 +177,15 @@ class changerUi(QMainWindow, Ui_MainWindow):
         self.ui.actionAbout.triggered.connect(self.show_about_dialog)
         self.ui.actionConfirm.triggered.connect(self.changeToPrevNamen)
 
+        self.ui.plusAction.triggered.connect(lambda: self.setPattern('+'))
+        self.ui.minusAction.triggered.connect(lambda: self.setPattern('-'))
+
+    def setPattern(self, signal):
+        if signal == '+':
+            shared_params.pattern = r'(?<=\+\D*)\d+'
+        elif signal == '-':
+            shared_params.pattern = r'(?<=\-\D*)\d+'
+
     def show_about_dialog(self):
         about_dialog = aboutMe()
         about_dialog.exec()
@@ -209,8 +230,11 @@ class changerUi(QMainWindow, Ui_MainWindow):
             config.write(configfile)
 
     def changeName(self):
-        self.task_thread.start()
-        self.ui.changePushButton.setEnabled(False)
+        if shared_params.pattern == "":
+            self.show_error_dialog("Please select the separator.")
+        else:
+            self.task_thread.start()
+            self.ui.changePushButton.setEnabled(False)
 
     def changeToPrevNamen(self):
         self.task_thread2.start()
